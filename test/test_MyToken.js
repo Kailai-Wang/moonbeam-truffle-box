@@ -46,4 +46,32 @@ contract('MyToken', accounts => {
         const balance2 = await token.balanceOf.call(accounts[2]);
         assert.equal(balance2, amountTransfer, 'accounts[2] balance is wrong');
     })
-});
+
+
+    // Set an allowance twice, the second approval should override the first one
+    it("the first allowance should be overriden by following approval for accounts[1]", async () => {
+        const amountAllow1 = "20000000000000000000";
+        const amountAllow2 = "10000000000000000000";
+        const REVERT_MESSAGE = "revert ERC20: transfer amount exceeds allowance";
+
+        // Approve accounts[1] to spend from accounts[0]
+        await token.approve(accounts[1], amountAllow1, { from: accounts[0] });
+        // Approve accounts[1] to spend from accounts[0] again, with a smaller amount
+        await token.approve(accounts[1], amountAllow2, { from: accounts[0] });
+        const allowance = await token.allowance.call(accounts[0], accounts[1]);
+        assert.equal(allowance, amountAllow2, 'allowance is wrong');
+
+        // Try to transfer more amount than amountAllow2 should fail
+        try {
+            await token.transferFrom(accounts[0], accounts[2], amountAllow2 + 100, { from: accounts[1] });
+        } catch (error) {
+            assert(error, "Expected an error but did not get one");
+            assert(error.message.includes(REVERT_MESSAGE), "Expected contains '" + REVERT_MESSAGE + "' but got '" + error.message + "' instead");
+        }
+        const balance1 = await token.balanceOf.call(accounts[2]);
+        // accounts[2] should not receive any amounts
+        assert.equal(balance1, 0, 'accounts[2] balance is wrong');
+        // accounts[0] should have the same balance as before
+        const balance2 = await token.balanceOf.call(accounts[0]);
+        assert.equal(balance2, _totalSupply, 'accounts[0] balance is wrong');
+    })});
